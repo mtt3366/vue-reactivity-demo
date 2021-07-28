@@ -17,7 +17,7 @@
         this.$data = option.data
         // 先去劫持数据
         observe(this.$data)
-        // nodeToFragment(this.$el,this) // 负责模板编译(渲染数据)
+        nodeToFragment(this.$el,this) // 负责模板编译(渲染数据)
         // 借助Fragment，编译vue语法中的行内属性或小胡子语法等
     }
     function observe(data){
@@ -50,6 +50,65 @@
             }
         })
     }
+
+    function nodeToFragment(el,vm){
+        // 借助文档碎片,把文档上的所有节点的vue语法编译完,转移到文档碎片上,然后将文档碎片再转移回$el,完成模板编译的过程
+        let fragment = document.createDocumentFragment();
+        let child;
+        //循环遍历所有的节点,对节点进行操作,并将其转移到fragment上
+        // 每转移一次,就会少一个节点,下一个节点会变成第一个,最后没有节点的时候,firstChild会返回nul,循环结束
+        while(child = el.firstChild){
+            //编译node节点
+            compile(child,vm)
+            fragment.appendChild(child)
+        }
+        el.appendChild(fragment)
+    }
+    function compile(node,vm){
+        // 编译 node节点.
+        // 原理:先要判断 节点的类型,看他是 元素节点还是文本节点(nodeType1元素节点 3文本节点 8注释节点 9根节点)
+        // 元素节点我们要考虑是 行内属性和他的子节点
+        // 文本节点直接进行小胡子语法替换即可
+
+        //例如编译v-model和小胡子语法的处理:
+        if(node.nodeType == 1){
+            //元素节点
+            let attrs = node.attributes; // 获取所有的行内属性
+            [...attrs].forEach(item=>{
+                // 获取 v-开头的行内属性 v-model (v-model="name")
+                console.dir(item)
+                if(/^v-/.test(item.nodeName)){ //"v-model"
+                    //使用正则取到取到 v-model对应的个值
+                    let vName = item.nodeValue ;// "name"
+                    let val = vm.$data[vName] ;// 获取到了 "涛涛"  这两个字
+
+                    // new Watcher(node,vName,vm)
+                    node.value = val;// 把 "涛涛"这两个字 放到 input框中
+                    // node.addEventListener('input',(e)=>{//视图改变,更新数据
+                    //     vm.$data[vName] = e.target.value
+                    // })
+                }
+            });
+
+            // 以上处理的是行内属性 ,除了行内属性,还要递归遍历编译子节点
+            [...node.childNodes].forEach(item=>{ // 递归编译 子节点
+                compile(item,vm)
+            })
+        }else{
+            // 文本节点  我们需要获取对应的文本字符串  然后把里边的小胡子转成真实Data
+            let str = node.textContent;// "{{name}}"
+            if(/\{\{(\w+)\}\}/.test(str)){//正则解析小胡子语法
+                str = str.replace(/\{\{(\w+)\}\}/,(a,b)=>{
+                    // b ---> name属性
+                    // new Watcher(node,b,vm)
+                    return vm.$data[b]//返回name属性的data 值
+                })
+                console.log(str)
+                node.textContent = str;//替换小胡子语法
+            }
+        }
+    }
+
 </script>
 <script>
     let vm = new Vue({
