@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>vue响应式原理-简单手写</title>
+</head>
+<body>
+<div id="app">
+    <input type="text" v-model="name" class='qqq'>
+    <h1>{{name}}</h1>
+</div>
+<script>
+    function Vue(option){
+        // 私有属性 $el 对应的是App元素
+        // 私有属性 $data对应的是传进来的data
+        this.$el = document.querySelector(option.el)
+        this.$data = option.data
+        // 先去劫持数据
+        observe(this.$data)
+        // nodeToFragment(this.$el,this) // 负责模板编译(渲染数据)
+        // 借助Fragment，编译vue语法中的行内属性或小胡子语法等
+    }
+    function observe(data){
+        //  判断 data是否是一个对象
+        if(({}).toString.call(data) !== '[object Object]')return ;
+        let keys = Object.keys(data);// 遍历所有属性,然后对每一个属性进行劫持
+        keys.forEach(key=>{
+            defineReactive$$1(data,key,data[key])
+        })
+    }
+    function defineReactive$$1(target,key,val){
+        // var dep = new Dep();// 每一个 key 都有自己的 dep
+        Object.defineProperty(target,key,{
+            enumerable:true,
+            get(){
+                // if(Dep.target){
+                //     // 为什么要有这个判断 ?能够触发get的方式有很多种,这里是为了保证能拿到new Watcher()时候的实例
+                //     dep.addSub(Dep.target)// 我们在事件池中放置的都是一些订阅者
+                // }
+                console.log('get被调用了')
+                return val
+            },
+            set(newV){
+                // if(newV !== val){
+                //     val = newV
+                //     dep.notify()
+                // }
+                console.log('set被调用了')
+                val = newV
+            }
+        })
+    }
+</script>
+<script>
+    let vm = new Vue({
+        el:'#app',
+        data:{
+            name:"涛涛"
+        }
+    });
+</script>
+</body>
+</html>
