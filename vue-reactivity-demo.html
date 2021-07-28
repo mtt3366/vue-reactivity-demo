@@ -29,24 +29,25 @@
         })
     }
     function defineReactive$$1(target,key,val){
-        // var dep = new Dep();// 每一个 key 都有自己的 dep
+        let dep = new Dep();// 每一个 key 都有自己的 dep
         Object.defineProperty(target,key,{
             enumerable:true,
             get(){
-                // if(Dep.target){
-                //     // 为什么要有这个判断 ?能够触发get的方式有很多种,这里是为了保证能拿到new Watcher()时候的实例
-                //     dep.addSub(Dep.target)// 我们在事件池中放置的都是一些订阅者
-                // }
-                console.log('get被调用了')
+                if(Dep.target){// 为什么要有这个判断 ?能够触发get的方式有很多种,这里是为了保证能拿到new Watcher()时候的实例
+                    //依赖收集，触发get函数，收集watcher
+                    dep.addSub(Dep.target)// 我们在事件池中放置的都是一些订阅者
+                }
+                // console.log('get被调用了')
                 return val
             },
             set(newV){
-                // if(newV !== val){
-                //     val = newV
-                //     dep.notify()
-                // }
-                console.log('set被调用了')
-                val = newV
+                //
+                if(newV !== val){
+                    val = newV
+                    dep.notify()
+                }
+                // console.log('set被调用了')
+                // val = newV
             }
         })
     }
@@ -76,17 +77,16 @@
             let attrs = node.attributes; // 获取所有的行内属性
             [...attrs].forEach(item=>{
                 // 获取 v-开头的行内属性 v-model (v-model="name")
-                console.dir(item)
+                // console.dir(item)
                 if(/^v-/.test(item.nodeName)){ //"v-model"
                     //使用正则取到取到 v-model对应的个值
                     let vName = item.nodeValue ;// "name"
                     let val = vm.$data[vName] ;// 获取到了 "涛涛"  这两个字
-
-                    // new Watcher(node,vName,vm)
+                    new Watcher(node,vName,vm)//观察到name使用了，收集到这里的依赖了，需要把观察者加到每一个data的目标的池子里
                     node.value = val;// 把 "涛涛"这两个字 放到 input框中
-                    // node.addEventListener('input',(e)=>{//视图改变,更新数据
-                    //     vm.$data[vName] = e.target.value
-                    // })
+                    node.addEventListener('input',(e)=>{//视图改变,更新数据，触发set
+                        vm.$data[vName] = e.target.value
+                    })
                 }
             });
 
@@ -100,12 +100,57 @@
             if(/\{\{(\w+)\}\}/.test(str)){//正则解析小胡子语法
                 str = str.replace(/\{\{(\w+)\}\}/,(a,b)=>{
                     // b ---> name属性
-                    // new Watcher(node,b,vm)
+                    new Watcher(node,b,vm)
                     return vm.$data[b]//返回name属性的data 值
                 })
-                console.log(str)
+                // console.log(str)
                 node.textContent = str;//替换小胡子语法
             }
+        }
+    }
+    //创造一个订阅器（目标）
+    class Dep{
+        // 每一个属性 都应该有自己的订阅器
+        constructor(){
+            this.subs = [];//观察者池
+        }
+        addSub(sub){
+            this.subs.push(sub)//添加观察者
+        }
+        notify(){// 负责通知事件池中的事件执行，通知观察者执行update方法
+            this.subs.forEach(sub=>{
+                // sub是watcher实例,在new Watch()依赖收集的的时候,被加进来的
+                sub.update()
+            })
+        }
+    }
+    //创造一个订阅者(观察者)，进行依赖收集
+    class Watcher{
+        constructor(node,key,vm){
+            console.log('watcher被触发了，依赖收集，将watcher对象添加到目标池子中')
+            Dep.target = this;// this就是watcher实例，当
+
+            this.node = node;
+            this.key = key;
+            this.vm = vm;
+            // 因为进行过数据劫持，所以会触发我们的get函数
+            //这个代码触发数据的get，可以让我们把 当前的这个watcher实例（也是Dep.target）放到对应的事件池中（依赖手机）
+            this.getValue();
+            Dep.target = null
+        }
+        update(){
+            console.log('修改了data，触发set，watcher的update被调用了，更新DOM')
+            // 负责更新DOM
+            this.getValue();// 获取新的value值
+            if(this.node.nodeType == 1){
+                // 只考虑input框
+                this.node.value = this.value
+            }else{//文本节点
+                this.node.textContent = this.value
+            }
+        }
+        getValue(){
+            this.value = this.vm.$data[this.key];// 因为进行过数据劫持，所以会触发我们的get函数
         }
     }
 
